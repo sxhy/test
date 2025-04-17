@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>浏览器内置语音转文字示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+        }
+
+        #transcript {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            min-height: 100px;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+            white-space: pre-wrap;
+            background-color: #f9f9f9;
+            overflow-y: auto;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+<h1>浏览器内置语音转文字示例</h1>
+<button id="startBtn">开始录音</button>
+<button id="stopBtn" disabled>停止录音</button>
+<div id="transcript">
+    {
+    "paragraphs": []
+    }
+</div>
+<input type="file" id="uploadPhoto" accept="image/*">
+<button id="takePhotoBtn">拍照</button>
+<button id="captureBtn">拍摄</button>
+<div id="preview"></div>
+
+<script>
+    (function () {
+        // 获取页面中的按钮和显示区域
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const transcriptDiv = document.getElementById('transcript');
+        // 状态变量
+        let isRecognizing = false; // 是否正在识别
+        let recognition = null; // 语音识别实例
+        let speechContent = {
+            paragraphs: []
+        }; // 存储识别内容
+        let currentParagraph = { sentences: [] }; // 当前段落
+
+        // 初始化 Web Speech API
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+        // 检查浏览器是否支持语音识别
+        if (!window.SpeechRecognition) {
+            alert("您的浏览器不支持语音识别。请使用最新版本的 Chrome 或 Edge。");
+            startBtn.disabled = true; // 禁用开始按钮
+            return;
+        }
+
+        // 创建语音识别实例
+        recognition = new window.SpeechRecognition();
+        recognition.lang = 'zh-CN'; // 设置语言为中文
+        recognition.interimResults = true; // 启用中间结果
+        recognition.continuous = true; // 启用连续识别
+
+        // 语音识别开始时的回调
+        recognition.onstart = () => {
+            console.log('语音识别已启动。');
+            isRecognizing = true;
+            startBtn.disabled = true; // 禁用开始按钮
+            stopBtn.disabled = false; // 启用停止按钮
+        };
+
+        // 语音识别出错时的回调
+        recognition.onerror = (event) => {
+            console.error('语音识别错误:', event.error);
+            alert(`语音识别错误: ${event.error}`);
+            isRecognizing = false;
+            startBtn.disabled = false; // 启用开始按钮
+            stopBtn.disabled = true; // 禁用停止按钮
+        };
+
+        // 语音识别结束时的回调
+        recognition.onend = () => {
+            console.log('语音识别已结束。');
+            isRecognizing = false;
+            startBtn.disabled = false; // 启用开始按钮
+            stopBtn.disabled = true; // 禁用停止按钮
+        };
+
+        // 语音识别结果时的回调
+        recognition.onresult = (event) => {
+            // 遍历所有识别结果
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                const transcript = result[0].transcript.trim(); // 获取识别的文本
+                const isFinal = result.isFinal; // 是否为最终结果
+
+                if (isFinal) {
+                    // 如果是最终结果，将句子添加到当前段落
+                    currentParagraph.sentences.push({ finalTranscript: transcript });
+                    speechContent.paragraphs.push(currentParagraph); // 将段落添加到speechContent
+                    currentParagraph = { sentences: [] }; // 重置当前段落
+                } else {
+                    // 如果是临时结果，更新当前段落的最后一个句子
+                    if (currentParagraph.sentences.length === 0) {
+                        // 如果当前段落没有句子，添加一个临时句子
+                        currentParagraph.sentences.push({ interimTranscript: transcript });
+                    } else {
+                        // 更新最后一个句子的临时文本
+                        currentParagraph.sentences[currentParagraph.sentences.length - 1].interimTranscript = transcript;
+                    }
+                }
+            }
+            updateTranscript(); // 更新显示区域
+        };
+
+        // 开始录音按钮的点击事件
+        startBtn.addEventListener('click', () => {
+            if (recognition && !isRecognizing) {
+                recognition.start(); // 启动语音识别
+                console.log('开始录音...');
+            }
+        });
+
+        // 停止录音按钮的点击事件
+        stopBtn.addEventListener('click', () => {
+            if (recognition && isRecognizing) {
+                recognition.stop(); // 停止语音识别
+                console.log('停止录音。');
+            }
+        });
+
+        // 更新显示区域的函数
+        function updateTranscript() {
+            // 将speechContent对象格式化为JSON字符串，并显示在页面上
+            transcriptDiv.textContent = JSON.stringify(speechContent, null, 2);
+            const currentInterim = currentParagraph.sentences
+                .map(s => s.interimTranscript);
+            console.log('最新临时片段:', currentInterim);
+            let transcript;
+            speechContent.paragraphs.forEach(paragraph => {
+               transcript= paragraph.sentences.map(s => s.interimTranscript);
+            });
+            console.log('最新结果:', transcript);
+
+        }
+        function checkKeywords(text) {
+            const keywords = ['上传图片', '上传照片', '选择图片'];
+            if (keywords.some(kw => text.includes(kw))) {
+
+            }
+        }
+        // 初始显示
+        updateTranscript();
+    })();
+    document.getElementById('uploadPhoto').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(event) {
+            const image = new Image();
+            image.onload = function() {
+                // 显示图片
+                const preview = document.getElementById('preview');
+                preview.appendChild(image);
+            };
+            image.src = event.target.result;
+        };
+
+        reader.readAsDataURL(file);
+    });
+    // 按钮触发拍照
+    document.getElementById('takePhotoBtn').addEventListener('click', function() {
+        // 请求摄像头权限
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                // 使用video元素预览
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                document.body.appendChild(video);
+
+                // 拍照按钮事件
+                document.getElementById('captureBtn').addEventListener('click', function() {
+                    // 创建canvas绘制当前帧
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0);
+
+                    // 将canvas转换为图片数据
+                    const dataUrl = canvas.toDataURL('image/png');
+
+                    // 停止摄像头
+                    stream.getTracks().forEach(track => track.stop());
+
+                    // 显示或保存图片
+                    const img = new Image();
+                    img.src = dataUrl;
+                    document.getElementById('preview').appendChild(img);
+                });
+            })
+            .catch(error => {
+                console.error('相机权限被拒绝');
+            });
+    });
+</script>
+</body>
+
+</html>
